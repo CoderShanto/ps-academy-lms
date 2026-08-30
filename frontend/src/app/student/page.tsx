@@ -25,6 +25,50 @@ export default function StudentDashboardPage() {
   const [records, setRecords] = useState<StudentProgressRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchMyProgress = async () => {
+    try {
+      const res = await api.get('/progress/my-progress');
+
+      // 1. Safely extract response array across different Strapi/Axios wrapping formats
+      let rawList: any[] = [];
+      if (Array.isArray(res.data)) {
+        rawList = res.data;
+      } else if (Array.isArray(res.data?.data)) {
+        rawList = res.data.data;
+      } else if (Array.isArray(res.data?.records)) {
+        rawList = res.data.records;
+      }
+
+      // 2. Normalize and deduplicate by course identifier
+      const seenIds = new Set<string>();
+      const uniqueRecords: StudentProgressRecord[] = [];
+
+      rawList.forEach((item: any) => {
+        const key = String(item.courseId || item.id || '');
+        if (key && !seenIds.has(key)) {
+          seenIds.add(key);
+          uniqueRecords.push({
+            id: item.id,
+            courseId: item.courseId || item.id,
+            courseTitle: item.courseTitle || 'Untitled Course',
+            courseDescription: item.courseDescription || '',
+            completedLessons: Number(item.completedLessons) || 0,
+            totalLessons: Number(item.totalLessons) || 0,
+            progressPercentage: Number(item.progressPercentage) || 0,
+            enrolledAt: item.enrolledAt || new Date().toISOString(),
+          });
+        }
+      });
+
+      setRecords(uniqueRecords.length > 0 ? uniqueRecords : rawList);
+    } catch (err) {
+      console.error('Failed to load my progress:', err);
+      setRecords([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!authLoading) {
       if (!user) {
@@ -34,25 +78,6 @@ export default function StudentDashboardPage() {
       }
     }
   }, [user, authLoading, router]);
-
-  const fetchMyProgress = async () => {
-    try {
-      const { data } = await api.get('/progress/my-progress');
-      const rawList: StudentProgressRecord[] = data?.data || [];
-
-      // Deduplicate records so each course appears only once
-      const uniqueRecords = rawList.filter(
-        (record, index, self) =>
-          index === self.findIndex((r) => String(r.courseId) === String(record.courseId))
-      );
-
-      setRecords(uniqueRecords);
-    } catch (err) {
-      console.error('Failed to load my progress:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (authLoading || loading) {
     return (
