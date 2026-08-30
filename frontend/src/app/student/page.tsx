@@ -38,7 +38,15 @@ export default function StudentDashboardPage() {
   const fetchMyProgress = async () => {
     try {
       const { data } = await api.get('/progress/my-progress');
-      setRecords(data.data || []);
+      const rawList: StudentProgressRecord[] = data?.data || [];
+
+      // Deduplicate records so each course appears only once
+      const uniqueRecords = rawList.filter(
+        (record, index, self) =>
+          index === self.findIndex((r) => String(r.courseId) === String(record.courseId))
+      );
+
+      setRecords(uniqueRecords);
     } catch (err) {
       console.error('Failed to load my progress:', err);
     } finally {
@@ -59,12 +67,15 @@ export default function StudentDashboardPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      {/* Header */}
-   {/* Header */}
+      {/* Header with High-Contrast Text */}
       <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Welcome back, {user?.username}!</h1>
-          <p className="text-gray-600 mt-1">Track your enrolled courses, lesson milestones, and completion status</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Welcome back, {user?.username}!
+          </h1>
+          <p className="text-gray-600 dark:text-gray-300 mt-1">
+            Track your enrolled courses, lesson milestones, and completion status
+          </p>
         </div>
         <Link
           href="/student/quizzes"
@@ -110,10 +121,10 @@ export default function StudentDashboardPage() {
       {/* Courses Progress Cards */}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">My Learning Progress</h2>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">My Learning Progress</h2>
           <Link
             href="/courses"
-            className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 flex items-center"
+            className="text-sm font-semibold text-indigo-600 hover:text-indigo-400 flex items-center"
           >
             Browse More Courses <ArrowRight className="h-4 w-4 ml-1" />
           </Link>
@@ -135,10 +146,11 @@ export default function StudentDashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {records.map((item) => {
               const isFinished = item.progressPercentage === 100;
+              const uniqueKey = item.courseId || item.id;
 
               return (
                 <div
-                  key={item.id}
+                  key={uniqueKey}
                   className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between hover:shadow-md transition"
                 >
                   <div>
