@@ -53,18 +53,22 @@ async function handleToggleProgress(ctx: any, strapi: any) {
 
 export default factories.createCoreController('api::progress.progress', ({ strapi }) => ({
   // 1. Fetch only the logged-in student's course progress breakdown
- async getMyProgress(ctx) {
+async getMyProgress(ctx) {
   const user = ctx.state.user;
   if (!user) return ctx.unauthorized('You must be logged in.');
 
   try {
-    // 1. Fetch enrollments
+    // student অথবা user উভয় রিলেশন চেক করবে
     const enrollments = await strapi.db.query('api::enrollment.enrollment').findMany({
-      where: { student: user.id },
+      where: {
+        $or: [
+          { student: user.id },
+          { user: user.id }
+        ]
+      },
       populate: ['course', 'course.lessons'],
     });
 
-    // 2. Fetch all completed progress for this student (checking both student and user fields)
     const studentProgress = await strapi.db.query('api::progress.progress').findMany({
       where: {
         $or: [
@@ -76,21 +80,17 @@ export default factories.createCoreController('api::progress.progress', ({ strap
       populate: ['lesson'],
     });
 
-    // 3. Collect all forms of completed lesson identifiers
-    const completedSet = new Set<string>();
-    studentProgress.forEach((p: any) => {
-      if (p.lesson?.id) completedSet.add(String(p.lesson.id));
-      if (p.lesson?.documentId) completedSet.add(String(p.lesson.documentId));
-    });
+    const completedLessonIds = studentProgress
+      .map((p: any) => p.lesson?.id || p.lesson?.documentId)
+      .filter(Boolean);
 
-    // 4. Map enrollments and calculate accurate percentages
     const records = enrollments.map((en: any) => {
       const course = en.course;
       const lessons = course?.lessons || [];
       const totalLessons = lessons.length;
 
-      const completedCount = lessons.filter((l: any) => 
-        completedSet.has(String(l.id)) || (l.documentId && completedSet.has(String(l.documentId)))
+      const completedCount = lessons.filter((l: any) =>
+        completedLessonIds.includes(l.id) || completedLessonIds.includes(l.documentId)
       ).length;
 
       const progressPercentage = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;

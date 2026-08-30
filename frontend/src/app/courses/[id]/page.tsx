@@ -76,32 +76,34 @@ export default function PublicCourseDetailPage({ params }: { params: Promise<{ i
     loadData();
   }, [courseId, user, isStudent]);
 
-  const handleEnroll = async () => {
+const handleEnroll = async () => {
     if (!user) {
       router.push('/login');
       return;
     }
 
-    if (!isStudent) {
-      alert('Staff accounts do not enroll as students.');
+    // Course null guard check for TypeScript
+    if (!course) {
+      console.error('No course selected');
       return;
     }
 
     setEnrolling(true);
     try {
+      const courseIdentifier = course.id || course.documentId;
+
       await api.post('/enrollments', {
         data: {
-          course: course?.id || course?.documentId,
+          course: courseIdentifier,
+          student: user.id,
         },
       });
+
       setIsEnrolled(true);
-      router.push(`/student/courses/${course?.documentId || course?.id}`);
-    } catch (err: unknown) {
-      if (isAxiosError(err)) {
-        alert(err.response?.data?.error?.message || 'Enrollment failed');
-      } else {
-        alert('Enrollment failed');
-      }
+      const targetPath = course.documentId || course.id;
+      router.push(`/student/courses/${targetPath}`);
+    } catch (err) {
+      console.error('Enrollment error:', err);
     } finally {
       setEnrolling(false);
     }
