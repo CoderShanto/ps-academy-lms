@@ -28,13 +28,26 @@ export default function StudentDashboardPage() {
 const fetchMyProgress = async () => {
     try {
       const res = await api.get('/progress/my-progress');
-      
-      // Strapi response structure
-      const rawList = Array.isArray(res.data) 
-        ? res.data 
-        : (res.data?.data || res.data?.records || []);
 
-      setRecords(rawList);
+      // ১. রেসপন্স থেকে অ্যারে বের করা
+      const rawList: StudentProgressRecord[] = Array.isArray(res.data)
+        ? res.data
+        : res.data?.data || res.data?.records || [];
+
+      // ২. টাইটেল এবং আইডি দিয়ে ডুপ্লিকেট ফিল্টার করা
+      const seen = new Set<string>();
+      const uniqueRecords: StudentProgressRecord[] = [];
+
+      rawList.forEach((item) => {
+        // কোর্স টাইটেল অথবা কোর্স আইডি দিয়ে ইউনিক কি তৈরি
+        const key = String(item.courseTitle || item.courseId || item.id).trim().toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueRecords.push(item);
+        }
+      });
+
+      setRecords(uniqueRecords);
     } catch (err) {
       console.error('Failed to load my progress:', err);
       setRecords([]);
