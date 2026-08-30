@@ -5,11 +5,13 @@ export default [
   {
     name: 'strapi::cors',
     config: {
-      enabled: true,
-      origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://192.168.0.102:3000'],
-      headers: ['*'],
+      origin: [
+        'https://ps-academy-lms-mauve.vercel.app',
+        'http://localhost:3000',
+      ],
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'],
-      credentials: true,
+      headers: ['Content-Type', 'Authorization', 'Origin', 'Accept'],
+      keepHeaderOnError: true,
     },
   },
   'strapi::poweredBy',
