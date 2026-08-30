@@ -1,126 +1,487 @@
-# 🎓 PS Academy LMS — Full-Stack Learning Management System
+# 🎓 PS Academy LMS
 
-A production-grade, full-stack Learning Management System (LMS) engineered with **Next.js (App Router)**, **TypeScript**, **Tailwind CSS**, and **Strapi CMS (v5)** with **PostgreSQL**.
+> A full-stack Learning Management System built to provide role-based course management, student enrollment, lesson progress tracking, online quizzes, automated grading, and content publishing.
 
----
+## 🌐 Live Application
 
-## 🔗 Live Deployments
-
-* **Frontend Web Application (Vercel):** [https://ps-academy-lms-mauve.vercel.app](https://ps-academy-lms-mauve.vercel.app)
-* **Backend API & Admin (Railway):** [https://ps-academy-lms-production.up.railway.app](https://ps-academy-lms-production.up.railway.app)
-* **Strapi Admin Dashboard:** [https://ps-academy-lms-production.up.railway.app/admin](https://ps-academy-lms-production.up.railway.app/admin)
-
----
-
-## 🔑 Demo Access & Role Credentials
-
-The platform enforces Role-Based Access Control (RBAC) across **four distinct user roles**. Use the credentials below to test each user journey:
-
-| Role | Username / Identifier | Password | Key Permissions & Capabilities |
-| :--- | :--- | :--- | :--- |
-| **Student** | `Student_User` | `Student@12345` | Browse catalog, enroll in courses, track lesson completion milestones, take interactive quizzes with automated grading, and view personal dashboard progress. |
-| **Instructor** | `Instructor_User` | `Instructor@12345` | Author and update courses, manage lesson contents, and view student progress analytics strictly isolated to their own created courses. |
-| **Content Manager** | `Manager_User` / `Content_User` | `Manager@12345` | Review, curate, and organize course curricula, lesson modules, quizzes, and multimedia assets without elevated system administration rights. |
-| **Admin** | `Admin_User` | `Admin@12345` | Full platform governance, user role provisioning, global curriculum oversight, and database monitoring via the Strapi Admin Panel and custom views. |
+| Application | URL |
+|---|---|
+| **Frontend** | https://ps-academy-lms-mauve.vercel.app |
+| **Backend API** | https://ps-academy-lms-production.up.railway.app |
+| **Strapi Admin** | https://ps-academy-lms-production.up.railway.app/admin |
 
 ---
 
-## 🚀 Core Features & Technical Architecture
+## 📌 Overview
 
-### 1. 🛡️ Role-Based Access Control (RBAC) & Backend Security
-* **Gateway-Level Policy Enforcement:** Permissions are enforced at the API level via the Strapi **Users & Permissions Plugin** and custom controller middlewares. Unauthorized requests return `401 Unauthorized` or `403 Forbidden`.
-* **Data Isolation:** In the progress controller (`getAllStudentProgress`), instructor requests apply strict filtering (`courseOwnerId === user.id`) to prevent unauthorized cross-instructor data visibility.
-* **Client Route Guards:** Next.js middleware and React Context authenticate session state and user roles prior to rendering protected pages.
+PS Academy LMS is a full-stack learning platform designed around three main user experiences:
 
----
+- **Students** can browse courses, enroll, access lessons, track their progress, and take quizzes.
+- **Instructors / Content Managers** can manage learning content such as courses, lessons, quizzes, and blog posts according to their permissions.
+- **Administrators** can manage users, roles, courses, lessons, and platform content.
 
-### 2. 📊 Relational Progress Tracking Engine
-* **Relational Schema:** Course progress is persisted in a relational `Progress` entity referencing `student` (User ID), `lesson` (Lesson ID), and a `completed` (Boolean) state.
-* **Idempotent Toggle Flow:** The `handleToggleProgress` controller method enables students to toggle lesson completion states idempotently.
-* **Dynamic Percentage Aggregation:** The `getMyProgress` endpoint aggregates completed lessons against total course modules:
-  $$\text{Progress (\%)} = \left( \frac{\text{Completed Lessons}}{\text{Total Lessons}} \right) \times 100$$
-  This calculation dynamically drives dashboard progress bars and course completion badges.
+The application follows a separated frontend/backend architecture using **Next.js** and **Strapi**, with **PostgreSQL** as the primary database.
 
 ---
 
-### 3. 📝 Assessment Engine & Server-Side Auto-Grading
-* **Secure Evaluation:** The `submitAttempt` controller compares student inputs on the server side against canonical answer keys stored in the database.
-* **Automated Scoring:** Computes percentage scores in real time and evaluates pass status against `quiz.passingScore` (default 60%).
-* **Historical Records:** Submissions are saved into the `QuizAttempt` entity for student record reviews and historical analytics.
+## ✨ Features
+
+### 🔐 Authentication & Authorization
+
+- User registration and login
+- JWT-based authentication
+- Role-based access control
+- Protected frontend routes
+- Backend permission enforcement
+- Separate capabilities for:
+  - Student
+  - Instructor
+  - Content Manager
+  - Admin
+- Unauthorized actions are rejected at the API level
 
 ---
 
-## 🔄 End-to-End Data Flow
+### 📚 Course Management
+
+- Course creation and management
+- Course descriptions and metadata
+- Lesson management
+- Multiple lessons per course
+- Ordered lesson sequence
+- Instructor ownership restrictions
+- Administrative content management
+
+---
+
+### 🎓 Student Enrollment
+
+- Browse available courses
+- Enroll in courses
+- View enrolled courses separately
+- Prevent unauthorized enrollment actions
+- Student-specific course access
+
+---
+
+### 📈 Progress Tracking
+
+Students can track their learning progress on a per-course basis.
+
+The system stores lesson completion state for each student and calculates progress dynamically:
 
 ```text
-[ Next.js Client ]
-       │  (1) POST /api/quiz-attempts/submit (JWT + Answers Payload)
-       ▼
-[ Strapi Backend Controller ]
-       │  (2) Verify JWT & Authorize Student Role
-       │  (3) Query Canonical Quiz & Question Keys from DB
-       │  (4) Grade Submissions & Calculate Percentage Score
-       │  (5) Persist Attempt to PostgreSQL ('QuizAttempt' Table)
-       ▼
-[ Next.js Client ]
-          (6) Receives Real-Time Score, Passing Badge & Updated Progress
+Progress % =
+(Completed Lessons / Total Lessons) × 100
+```
 
-          🛠️ Tech Stack
-Frontend: Next.js 14+ (App Router), TypeScript, Tailwind CSS, Lucide React, Axios
+Example:
 
-Backend: Strapi CMS v5 (Node.js REST API)
+```text
+Completed: 3 lessons
+Total:     5 lessons
 
-Database: PostgreSQL
+Progress: 60%
+```
 
-Authentication: JWT (JSON Web Tokens)
+Progress persists across page refreshes and is isolated per student.
 
-Deployment: Vercel (Frontend), Railway (Backend & PostgreSQL Database)
+---
 
-💻 Local Development Setup
-1. Backend Setup (Strapi)
-Bash
-# Clone the repository
-git clone <your-backend-repo-url>
+### 📝 Quiz & Auto-Grading
+
+- MCQ-based quizzes
+- Multiple questions and answer options
+- Correct-answer configuration
+- Server-side answer validation
+- Automatic score calculation
+- Passing-score evaluation
+- Quiz attempt persistence
+- Previous quiz results can be viewed later
+
+Quiz grading is performed on the backend rather than trusting the client-side answer evaluation.
+
+---
+
+### 🛠️ Admin Management
+
+Administrators can manage platform-level resources including:
+
+- Users
+- User roles
+- Courses
+- Lessons
+- Blog posts
+- Platform statistics
+
+The admin area is protected so that administrative functionality is not accessible to unauthorized users.
+
+---
+
+### 📰 Blog & Publishing
+
+- Create blog posts
+- Edit blog posts
+- Delete blog posts
+- Draft / Published workflow
+- Cover image support
+- Public access to published posts
+- Draft posts remain unavailable to public users
+
+---
+
+## 🏗️ Architecture
+
+```text
+                    ┌──────────────────────┐
+                    │      Next.js         │
+                    │      Frontend        │
+                    │                      │
+                    │  App Router          │
+                    │  TypeScript          │
+                    │  Tailwind CSS        │
+                    └──────────┬───────────┘
+                               │
+                               │ REST API
+                               ▼
+                    ┌──────────────────────┐
+                    │       Strapi         │
+                    │       Backend        │
+                    │                      │
+                    │ Authentication       │
+                    │ Authorization        │
+                    │ Content Management   │
+                    │ Custom Controllers   │
+                    │ Business Logic       │
+                    └──────────┬───────────┘
+                               │
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │     PostgreSQL       │
+                    │       Database       │
+                    └──────────────────────┘
+```
+
+---
+
+## 🔄 Example Data Flow
+
+### Quiz Submission
+
+```text
+Student
+   │
+   │ Submit answers
+   ▼
+Next.js Frontend
+   │
+   │ REST API + Authentication
+   ▼
+Strapi Controller
+   │
+   ├── Authenticate user
+   ├── Verify student permissions
+   ├── Retrieve quiz questions
+   ├── Validate submitted answers
+   ├── Calculate score
+   ├── Determine pass/fail
+   └── Store quiz attempt
+   │
+   ▼
+PostgreSQL
+   │
+   ▼
+Strapi API
+   │
+   ▼
+Next.js
+   │
+   ▼
+Score & Result displayed to student
+```
+
+---
+
+## 🗂️ Core Data Model
+
+The main entities are:
+
+```text
+User
+ │
+ ├── Enrollments
+ ├── Progress
+ └── Quiz Attempts
+
+Course
+ │
+ ├── Lessons
+ ├── Enrollments
+ ├── Progress
+ └── Quizzes
+
+Lesson
+ │
+ └── Progress
+
+Quiz
+ │
+ ├── Questions
+ └── Quiz Attempts
+
+Blog Post
+ │
+ └── Author / Publishing State
+```
+
+### Main Relationships
+
+```text
+User 1 ───────── * Enrollment
+Course 1 ─────── * Enrollment
+
+Course 1 ─────── * Lesson
+
+User 1 ───────── * Progress
+Lesson 1 ─────── * Progress
+
+Course 1 ─────── * Quiz
+Quiz 1 ───────── * Question
+
+User 1 ───────── * QuizAttempt
+Quiz 1 ───────── * QuizAttempt
+```
+
+---
+
+## 🧰 Technology Stack
+
+### Frontend
+
+- Next.js
+- React
+- TypeScript
+- App Router
+- Tailwind CSS
+- Lucide React
+- Axios
+
+### Backend
+
+- Strapi CMS v5
+- Node.js
+- REST API
+- Users & Permissions Plugin
+- Custom Controllers / Business Logic
+
+### Database
+
+- PostgreSQL
+
+### Authentication
+
+- JWT
+- Role-Based Access Control (RBAC)
+
+### Deployment
+
+- Vercel — Frontend
+- Railway — Backend
+- PostgreSQL — Production Database
+
+---
+
+## 🚀 Local Development
+
+### Prerequisites
+
+Make sure you have installed:
+
+- Node.js
+- npm
+- PostgreSQL
+- Git
+
+---
+
+### 1. Clone the repositories
+
+```bash
+git clone <frontend-repository-url>
+git clone <backend-repository-url>
+```
+
+---
+
+### 2. Backend Setup
+
+```bash
 cd backend
-
-# Install dependencies
 npm install
+```
 
-# Configure environment variables (.env)
+Create a `.env` file:
+
+```env
 HOST=0.0.0.0
 PORT=1337
+
 APP_KEYS=your_app_keys
-API_TOKEN_SALT=your_token_salt
+API_TOKEN_SALT=your_api_token_salt
 ADMIN_JWT_SECRET=your_admin_jwt_secret
 TRANSFER_TOKEN_SALT=your_transfer_token_salt
 JWT_SECRET=your_jwt_secret
+
 DATABASE_CLIENT=postgres
-DATABASE_URL=your_postgres_connection_string
+DATABASE_URL=your_postgresql_connection_string
+```
 
-# Start backend development server
+Start Strapi:
+
+```bash
 npm run develop
-2. Frontend Setup (Next.js)
-Bash
-# Clone the repository
-git clone <your-frontend-repo-url>
+```
+
+The Strapi admin panel will be available at:
+
+```text
+http://localhost:1337/admin
+```
+
+---
+
+### 3. Frontend Setup
+
+```bash
 cd frontend
-
-# Install dependencies
 npm install
+```
 
-# Configure environment variables (.env.local)
-NEXT_PUBLIC_API_URL=[https://ps-academy-lms-production.up.railway.app/api](https://ps-academy-lms-production.up.railway.app/api)
-NEXT_PUBLIC_STRAPI_URL=[https://ps-academy-lms-production.up.railway.app](https://ps-academy-lms-production.up.railway.app)
+Create `.env.local`:
 
-# Start frontend development server
+```env
+NEXT_PUBLIC_API_URL=http://localhost:1337/api
+NEXT_PUBLIC_STRAPI_URL=http://localhost:1337
+```
+
+Start Next.js:
+
+```bash
 npm run dev
-Visit http://localhost:3000 to interact with the application locally.
+```
 
-👤 Author
-Developer: Pranta Saha
+Open:
 
-Role: Full-Stack Software Engineer
+```text
+http://localhost:3000
+```
 
-GitHub: https://github.com/prantasaha
+---
 
-LinkedIn: https://linkedin.com/in/prantasaha
+## 🔑 Demo Access
+
+Demo accounts are available for testing the different application roles.
+
+For security, **passwords are intentionally not published in this repository**.
+
+| Role | Access |
+|---|---|
+| Student | Student learning experience |
+| Instructor | Course and lesson management |
+| Content Manager | Platform content management |
+| Admin | Full administrative management |
+
+> Demo credentials can be provided separately for evaluation purposes.
+
+---
+
+## 🔒 Security Considerations
+
+The application uses multiple layers of access control:
+
+```text
+Request
+   ↓
+Authentication
+   ↓
+User Identity
+   ↓
+Role Verification
+   ↓
+Permission / Ownership Check
+   ↓
+Business Logic
+   ↓
+Database
+```
+
+Frontend UI restrictions are not treated as the primary security mechanism. Sensitive operations are validated on the backend.
+
+---
+
+## 📊 Key Engineering Highlights
+
+### Backend-enforced RBAC
+
+Permissions are enforced at the API layer rather than relying solely on hidden frontend controls.
+
+### Student-specific progress
+
+Progress records are associated with individual students and lessons, preventing progress data from being shared between users.
+
+### Server-side quiz evaluation
+
+Quiz answers are evaluated on the backend using the stored correct answers instead of trusting a score submitted by the browser.
+
+### Instructor data isolation
+
+Instructor-level operations are restricted to resources they are authorized to manage.
+
+### Persistent learning state
+
+Enrollment, lesson completion, and quiz attempts are persisted in the database.
+
+---
+
+## 📁 Project Structure
+
+```text
+PS-Academy-LMS/
+│
+├── frontend/
+│   ├── app/
+│   ├── components/
+│   ├── lib/
+│   ├── public/
+│   └── ...
+│
+├── backend/
+│   ├── src/
+│   │   ├── api/
+│   │   ├── components/
+│   │   └── ...
+│   ├── config/
+│   └── ...
+│
+└── README.md
+```
+
+> Adjust the structure above if your actual repository uses different directory names.
+
+---
+
+## 👨‍💻 Author
+
+**Mahmud Hasan Shanto**
+
+Full-Stack Software Engineer
+
+- **GitHub:** https://github.com/CoderShanto
+- **LinkedIn:** https://www.linkedin.com/in/md-mahmud-hasan-shanto-614b37224/
+
+---
+
+## 📄 License
+
+This project was developed as a full-stack LMS application demonstrating modern frontend development, backend API design, authentication, authorization, database relationships, and application architecture.
