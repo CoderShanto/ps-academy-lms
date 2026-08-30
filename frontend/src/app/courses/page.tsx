@@ -27,8 +27,20 @@ export default function CoursesPage() {
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const { data } = await api.get('/courses?populate=*');
-        setCourses(data.data || []);
+        // Query only published entries in Strapi 5
+        const { data } = await api.get('/courses?status=published&populate=*');
+        const rawList: Course[] = data?.data || [];
+
+        // Deduplicate courses by documentId or id
+        const uniqueCourses = rawList.filter(
+          (course, index, self) =>
+            index ===
+            self.findIndex(
+              (c) => (c.documentId || c.id) === (course.documentId || course.id)
+            )
+        );
+
+        setCourses(uniqueCourses);
       } catch (err: unknown) {
         if (isAxiosError(err)) {
           setError(err.response?.data?.error?.message || 'Failed to load courses.');
@@ -63,7 +75,7 @@ export default function CoursesPage() {
             placeholder="Search courses..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
           />
         </div>
       </div>
@@ -85,7 +97,7 @@ export default function CoursesPage() {
             const courseParam = course.documentId || course.id;
             return (
               <div
-                key={course.id}
+                key={courseParam}
                 className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition flex flex-col justify-between"
               >
                 <div className="p-6">
