@@ -264,16 +264,15 @@ export default function Home() {
                       : 'hover:bg-gray-100 dark:hover:bg-slate-800'
                   }`}
                 >
-                  <div 
-                    className={`w-8 h-8 rounded-full transition-transform group-hover:scale-110 ${
-                      colorTheme === option.key ? 'ring-2 ring-offset-2 scale-110' : ''
-                    }`}
-                    style={{ 
-                      backgroundColor: option.color,
-                      ringColor: option.color,
-                      ringOffsetColor: isDark ? '#0f172a' : '#ffffff'
-                    }}
-                  />
+        <div
+  className={`w-8 h-8 rounded-full transition-transform group-hover:scale-110 ${
+    colorTheme === option.key ? 'ring-2 ring-offset-2 scale-110' : ''
+  }`}
+  style={{
+    backgroundColor: option.color,
+    boxShadow: colorTheme === option.key ? `0 0 0 2px ${isDark ? '#0f172a' : '#ffffff'}, 0 0 0 4px ${option.color}` : undefined,
+  }}
+/>
                   <span className={`text-[10px] font-medium ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
                     {option.label}
                   </span>
