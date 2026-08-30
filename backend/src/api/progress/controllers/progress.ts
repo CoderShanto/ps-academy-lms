@@ -7,17 +7,17 @@ async function handleToggleProgress(ctx: any, strapi: any) {
   const { lessonId } = ctx.request.body || {};
   if (!lessonId) return ctx.badRequest('lessonId is required.');
 
-
-
-  const isDocId = typeof lessonId === 'string' && isNaN(Number(lessonId));
-  const targetLesson = await strapi.db.query('api::lesson.lesson').findOne({
-    where: isDocId ? { documentId: lessonId } : { id: Number(lessonId) },
-  });
-
-  if (!targetLesson) return ctx.notFound('Lesson not found.');
-
-
   try {
+    const isDocId = typeof lessonId === 'string' && isNaN(Number(lessonId));
+    
+    // 1. Target lesson fetch (support both id and documentId)
+    const targetLesson = await strapi.db.query('api::lesson.lesson').findOne({
+      where: isDocId ? { documentId: lessonId } : { id: Number(lessonId) },
+    });
+
+    if (!targetLesson) return ctx.notFound('Lesson not found.');
+
+    // 2. Find existing progress
     const existing = await strapi.db.query('api::progress.progress').findOne({
       where: {
         student: user.id,
@@ -33,8 +33,6 @@ async function handleToggleProgress(ctx: any, strapi: any) {
         },
       });
       return { completed: updated.completed };
-
-
     } else {
       const created = await strapi.db.query('api::progress.progress').create({
         data: {
@@ -53,66 +51,83 @@ async function handleToggleProgress(ctx: any, strapi: any) {
 
 export default factories.createCoreController('api::progress.progress', ({ strapi }) => ({
   // 1. Fetch only the logged-in student's course progress breakdown
-async getMyProgress(ctx) {
-  const user = ctx.state.user;
-  if (!user) return ctx.unauthorized('You must be logged in.');
+  async getMyProgress(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized('You must be logged in.');
 
-  try {
-    // student অথবা user উভয় রিলেশন চেক করবে
-    const enrollments = await strapi.db.query('api::enrollment.enrollment').findMany({
-      where: {
-        $or: [
-          { student: user.id },
-          { user: user.id }
-        ]
-      },
-      populate: ['course', 'course.lessons'],
-    });
+    try {
+      // 1. Fetch student's enrollments with deep population
+      const enrollments = await strapi.db.query('api::enrollment.enrollment').findMany({
+        where: {
+          student: user.id,
+        },
+        populate: {
+          course: {
+            populate: ['lessons'],
+          },
+        },
+      });
 
-    const studentProgress = await strapi.db.query('api::progress.progress').findMany({
-      where: {
-        $or: [
-          { student: user.id },
-          { user: user.id }
-        ],
-        completed: true,
-      },
-      populate: ['lesson'],
-    });
+      // Fallback: If no enrollment with 'student', try with 'user' relation
+      const finalEnrollments = (enrollments && enrollments.length > 0) 
+        ? enrollments 
+        : await strapi.db.query('api::enrollment.enrollment').findMany({
+            where: { user: user.id },
+            populate: {
+              course: {
+                populate: ['lessons'],
+              },
+            },
+          });
 
-    const completedLessonIds = studentProgress
-      .map((p: any) => p.lesson?.id || p.lesson?.documentId)
-      .filter(Boolean);
+      // 2. Fetch student's completed lessons
+      const studentProgress = await strapi.db.query('api::progress.progress').findMany({
+        where: {
+          student: user.id,
+          completed: true,
+        },
+        populate: ['lesson'],
+      });
 
-    const records = enrollments.map((en: any) => {
-      const course = en.course;
-      const lessons = course?.lessons || [];
-      const totalLessons = lessons.length;
+      // 3. Collect completed lesson identifiers in a robust Set
+      const completedSet = new Set<string>();
+      (studentProgress || []).forEach((p: any) => {
+        if (p.lesson?.id) completedSet.add(String(p.lesson.id));
+        if (p.lesson?.documentId) completedSet.add(String(p.lesson.documentId));
+      });
 
-      const completedCount = lessons.filter((l: any) =>
-        completedLessonIds.includes(l.id) || completedLessonIds.includes(l.documentId)
-      ).length;
+      // 4. Map enrollments and calculate accurate progress
+      const records = (finalEnrollments || [])
+        .filter((en: any) => en && en.course)
+        .map((en: any) => {
+          const course = en.course;
+          const lessons = Array.isArray(course.lessons) ? course.lessons : [];
+          const totalLessons = lessons.length;
 
-      const progressPercentage = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+          const completedCount = lessons.filter((l: any) => 
+            completedSet.has(String(l.id)) || (l.documentId && completedSet.has(String(l.documentId)))
+          ).length;
 
-      return {
-        id: en.id,
-        courseId: course?.documentId || course?.id,
-        courseTitle: course?.title || 'Untitled Course',
-        courseDescription: course?.description || '',
-        completedLessons: completedCount,
-        totalLessons,
-        progressPercentage,
-        enrolledAt: en.createdAt,
-      };
-    });
+          const progressPercentage = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
 
-    return { data: records };
-  } catch (err: any) {
-    console.error('getMyProgress error:', err);
-    return ctx.internalServerError('Failed to load your progress.');
-  }
-},
+          return {
+            id: en.id,
+            courseId: course.documentId || course.id,
+            courseTitle: course.title || 'Untitled Course',
+            courseDescription: course.description || '',
+            completedLessons: completedCount,
+            totalLessons,
+            progressPercentage,
+            enrolledAt: en.createdAt,
+          };
+        });
+
+      return { data: records };
+    } catch (err: any) {
+      console.error('getMyProgress error:', err);
+      return ctx.internalServerError('Failed to load your progress.');
+    }
+  },
 
   // 2. Fetch all student progress for Admins / Instructors / Content Managers
   async getAllStudentProgress(ctx) {
@@ -124,7 +139,10 @@ async getMyProgress(ctx) {
 
     try {
       const enrollments = await strapi.db.query('api::enrollment.enrollment').findMany({
-        populate: ['student', 'student.role', 'course', 'course.lessons', 'course.instructor'],
+        populate: {
+          student: { populate: ['role'] },
+          course: { populate: ['lessons', 'instructor'] },
+        },
       });
 
       const allProgress = await strapi.db.query('api::progress.progress').findMany({
@@ -152,12 +170,18 @@ async getMyProgress(ctx) {
       const records = targetEnrollments.map((en: any) => {
         const student = en.student;
         const course = en.course;
-        const totalLessons = course?.lessons?.length || 0;
-        const courseLessonIds = (course?.lessons || []).map((l: any) => l.id);
+        const lessons = course?.lessons || [];
+        const totalLessons = lessons.length;
+        const courseLessonIds = lessons.map((l: any) => String(l.id));
+        const courseLessonDocIds = lessons.map((l: any) => String(l.documentId)).filter(Boolean);
 
-        const studentCompleted = allProgress.filter(
-          (p: any) => p.student?.id === student?.id && courseLessonIds.includes(p.lesson?.id)
-        );
+        const studentCompleted = allProgress.filter((p: any) => {
+          const isStudentMatch = p.student?.id === student?.id;
+          const isLessonMatch = 
+            courseLessonIds.includes(String(p.lesson?.id)) ||
+            courseLessonDocIds.includes(String(p.lesson?.documentId));
+          return isStudentMatch && isLessonMatch;
+        });
 
         const completedCount = studentCompleted.length;
         const progressPercentage = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
@@ -182,6 +206,7 @@ async getMyProgress(ctx) {
     }
   },
 
+  // 3. Fetch single course progress for student view
   async getCourseProgress(ctx) {
     const user = ctx.state.user;
     if (!user) return ctx.unauthorized('You must be logged in.');
@@ -220,7 +245,7 @@ async getMyProgress(ctx) {
       });
 
       const completedLessonIds = completedProgress
-        .map((p: any) => p.lesson?.documentId || p.lesson?.id)
+        .map((p: any) => p.lesson?.documentId || String(p.lesson?.id))
         .filter(Boolean);
       const completedCount = completedLessonIds.length;
       const progressPercentage = Math.round((completedCount / totalLessons) * 100);
